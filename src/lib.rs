@@ -28,9 +28,6 @@ pub fn run() -> Result<(), ProjectError> {
         locations: HashMap::new(),
     };
 
-    state.add_location(Location::new("Home", None)?)?;
-    state.save()?;
-
     loop {
         // this_state.current_location.print_location();
         let _i: String = read!();
@@ -143,21 +140,3 @@ impl fmt::Display for Location {
         Ok(())
     }
 }
-
-// scratch notes:
-
-// pub struct Config
-//	* reads from norp_config.toml
-//	* holds file_locations
-
-// pub struct State
-//	* reads from locations.json
-//	* received a Config on construction
-//	* holds location_current
-//	* holds locations
-
-// pub struct Location
-//	* holds a GUID
-//	* holds a name
-//	* holds a description
-//	* has a to_string() method

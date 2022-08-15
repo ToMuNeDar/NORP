@@ -8,13 +8,15 @@ use crate::error::ProjectError;
 use crate::error::ProjectError::*;
 
 // external dependencies
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json;
 use text_io::read;
 use toml;
+use uuid::{uuid, Uuid};
 
 // standard dependencies
 use std::collections::HashMap;
+use std::fmt;
 use std::fs;
 use std::path::*;
 
@@ -22,11 +24,11 @@ pub fn run() -> Result<(), ProjectError> {
     let config = Config::new(None)?;
     let mut state = State {
         config: &config,
-        location_current: 1,
+        location_current: Uuid::new_v4(),
         locations: HashMap::new(),
     };
 
-    state.add_location("home", 1)?;
+    state.add_location(Location::new("Home", None)?)?;
     state.save()?;
 
     loop {
@@ -61,8 +63,8 @@ impl Config {
 /// State object
 pub struct State<'a> {
     config: &'a Config,
-    location_current: u8,
-    locations: HashMap<String, u8>,
+    location_current: Uuid,
+    locations: HashMap<Uuid, Location>,
 }
 
 impl State<'_> {
@@ -73,8 +75,13 @@ impl State<'_> {
         // Read file
         let locations_data = fs::read_to_string(locations_file).map_err(|_| StandardError)?;
         // Deserialize and store locations
-        let locations = serde_json::from_str(&locations_data).map_err(|_| StandardError)?;
-        let location_current: u8 = 1;
+        let locations: HashMap<Uuid, Location> =
+            serde_json::from_str(&locations_data).map_err(|_| StandardError)?;
+        let location_current = locations
+            .keys()
+            .next()
+            .ok_or_else(|| StandardError)?
+            .to_owned();
 
         Ok(State::<'a> {
             config: config,
@@ -93,14 +100,46 @@ impl State<'_> {
         fs::write(locations_file, locations_data).map_err(|_| StandardError)
     }
 
-    pub fn add_location(
-        &mut self,
-        location_name: &str,
-        location_value: u8,
-    ) -> Result<(), ProjectError> {
+    /// Adds a new location to locations
+    pub fn add_location(&mut self, location: Location) -> Result<(), ProjectError> {
         // Insert into HashMap
-        self.locations
-            .insert(String::from(location_name), location_value);
+        self.locations.insert(location.id, location);
+        Ok(())
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Location {
+    id: Uuid,
+    name: String,
+    description: String,
+}
+
+impl Location {
+    const DEFAULT_DESCRIPTION: &'static str = "A new location.";
+
+    pub fn new(name: &str, description: Option<&str>) -> Result<Location, ProjectError> {
+        let id = Uuid::new_v4();
+        let name = String::from(name);
+        let description =
+            String::from(description.unwrap_or_else(|| Location::DEFAULT_DESCRIPTION));
+
+        Ok(Location {
+            id,
+            name,
+            description,
+        })
+    }
+
+    pub fn print(&self) {
+        println!("{}", self);
+    }
+}
+
+impl fmt::Display for Location {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let s = format!("<---{}--->\n{}", self.name, self.description);
+        fmt.write_str(s.as_str())?;
         Ok(())
     }
 }

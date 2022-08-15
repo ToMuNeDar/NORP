@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use serde_json;
 use text_io::read;
 use toml;
-use uuid::{uuid, Uuid};
+use uuid::Uuid;
 
 // standard dependencies
 use std::collections::HashMap;
@@ -22,14 +22,10 @@ use std::path::*;
 
 pub fn run() -> Result<(), ProjectError> {
     let config = Config::new(None)?;
-    let mut state = State {
-        config: &config,
-        location_current: Uuid::new_v4(),
-        locations: HashMap::new(),
-    };
+    let state = State::new(&config)?;
 
     loop {
-        // this_state.current_location.print_location();
+        state.get_current_location()?.print();
         let _i: String = read!();
     }
 }
@@ -60,7 +56,7 @@ impl Config {
 /// State object
 pub struct State<'a> {
     config: &'a Config,
-    location_current: Uuid,
+    id_current_location: Uuid,
     locations: HashMap<Uuid, Location>,
 }
 
@@ -70,31 +66,33 @@ impl State<'_> {
         // Get owned file path
         let locations_file = &config.locations_file;
         // Read file
-        let locations_data = fs::read_to_string(locations_file).map_err(|_| StandardError)?;
+        let locations_data =
+            fs::read_to_string(locations_file).map_err(|_| LocationsFileReadError)?;
         // Deserialize and store locations
         let locations: HashMap<Uuid, Location> =
-            serde_json::from_str(&locations_data).map_err(|_| StandardError)?;
-        let location_current = locations
+            serde_json::from_str(&locations_data).map_err(|_| LocationsFileDeserializeError)?;
+        let id_current_location = locations
             .keys()
             .next()
-            .ok_or_else(|| StandardError)?
+            .ok_or_else(|| HashMapFirstKeyError)?
             .to_owned();
 
         Ok(State::<'a> {
-            config: config,
-            location_current,
+            config,
+            id_current_location,
             locations,
         })
     }
 
     /// Saves locations to the file
-    pub fn save(&mut self) -> Result<(), ProjectError> {
+    pub fn save(&self) -> Result<(), ProjectError> {
         // Get owned file path
         let locations_file = &self.config.locations_file;
         // Serialize locations
-        let locations_data = serde_json::to_string(&self.locations).map_err(|_| StandardError)?;
+        let locations_data =
+            serde_json::to_string(&self.locations).map_err(|_| LocationsFileSerializeError)?;
         // Write to file
-        fs::write(locations_file, locations_data).map_err(|_| StandardError)
+        fs::write(locations_file, locations_data).map_err(|_| LocationsFileWriteError)
     }
 
     /// Adds a new location to locations
@@ -103,9 +101,16 @@ impl State<'_> {
         self.locations.insert(location.id, location);
         Ok(())
     }
+
+    /// Returns a reference to the current location
+    pub fn get_current_location(&self) -> Result<&Location, ProjectError> {
+        self.locations
+            .get(&self.id_current_location)
+            .ok_or_else(|| HashMapGetError(self.id_current_location.to_string()))
+    }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Location {
     id: Uuid,
     name: String,

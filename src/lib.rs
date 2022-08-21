@@ -21,19 +21,51 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::*;
 
+/// The runtime for the program called in main.rs
+///
+/// # Returns
+/// A `Result` which is:
+///
+/// - `Ok`: Ran without issue
+/// - `Err`: Encountered an issue
 pub fn run() -> Result<(), ProjectError> {
     let config = Config::new(None)?;
     let state = State::new(&config)?;
 
     loop {
         state.get_current_location()?.print();
-        let _i: String = read!();
+        let input: String = read!("{}\n");
+        let command = Command::new(input.as_str())?;
     }
 }
 
-/// Configuration object
+pub enum Command {
+    Move(Vec<String>),
+    AddLocation(Vec<String>),
+}
+
+impl Command {
+    /// Returns a Command
+    pub fn new(input: &str) -> Result<Command, ProjectError> {
+        // Split by whitespace
+        let mut input_iter = input.split(" ");
+        // Separate out command identifier from the arguments
+        let input_first = input_iter.next().ok_or_else(|| CommandNotGivenError)?;
+        let input_rest: Vec<String> = input_iter.map(|s| String::from(s)).collect();
+        // Match on command identifier and pass arguments
+        match input_first {
+            "move" => Ok(Command::Move(input_rest)),
+            "add_location" => Ok(Command::AddLocation(input_rest)),
+            _ => Err(CommandUnrecognizedError(String::from(input_first))),
+        }
+    }
+}
+
+/// Represents the configuration set in `data/norp.config.toml. Should contain all of the
+/// configuration information necessary for the program to run.
 #[derive(Deserialize)]
 pub struct Config {
+    /// The location of the JSON file containing all of the Location objects in a HashMap
     locations_file: PathBuf,
 }
 

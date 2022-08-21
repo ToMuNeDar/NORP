@@ -17,4 +17,8 @@ pub enum ProjectError {
     HashMapGetError(String),
     #[error("Failed to retrieve first key from HashMap.")]
     HashMapFirstKeyError,
+    #[error("Command not provided.")]
+    CommandNotGivenError,
+    #[error("Unrecognized command: \"{0}\".")]
+    CommandUnrecognizedError(String),
 }

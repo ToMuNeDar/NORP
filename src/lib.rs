@@ -30,12 +30,31 @@ use std::path::*;
 /// - `Err`: Encountered an issue
 pub fn run() -> Result<(), ProjectError> {
     let config = Config::new(None)?;
-    let state = State::new(&config)?;
+    let mut state = State::new(&config)?;
 
     loop {
+        // State present location
         state.get_current_location()?.print();
+        // Read inputs or skip loop if none valid
         let input: String = read!("{}\n");
-        let command = Command::new(input.as_str())?;
+        let command = match Command::new(input.as_str()) {
+            Err(project_error) => match project_error {
+                CommandUnrecognizedError(_) => {
+                    println!("{}", project_error);
+                    continue;
+                }
+                _ => return Err(project_error),
+            },
+            Ok(command) => command,
+        };
+        // Execute command
+        match command.execute(&mut state) {
+            Err(project_error) => match project_error {
+                MoveNoLocationError | LocationInvalidIdError => println!("{}", project_error),
+                _ => return Err(project_error),
+            },
+            _ => (),
+        };
     }
 }
 
@@ -57,6 +76,18 @@ impl Command {
             "move" => Ok(Command::Move(input_rest)),
             "add_location" => Ok(Command::AddLocation(input_rest)),
             _ => Err(CommandUnrecognizedError(String::from(input_first))),
+        }
+    }
+
+    pub fn execute(&self, state: &mut State) -> Result<(), ProjectError> {
+        match self {
+            Command::Move(args) => {
+                let mut id: Uuid =
+                    Uuid::parse_str(args.get(0).ok_or_else(|| MoveNoLocationError)?.as_str())
+                        .map_err(|_| LocationInvalidIdError)?;
+                state.set_current_location(&mut id)
+            }
+            Command::AddLocation(args) => Err(StandardError),
         }
     }
 }
@@ -135,10 +166,34 @@ impl State<'_> {
         Ok(())
     }
 
+    /// Checks if the Location corresponding to the provided `id` exists and sets
+    /// `id_current_location` to `id` if so.
+    pub fn set_current_location(&mut self, id: &mut Uuid) -> Result<(), ProjectError> {
+        match self.check_location_exists(id) {
+            true => {
+                self.id_current_location = id.to_owned();
+                Ok(())
+            }
+            false => Err(LocationNotFoundError),
+        }
+    }
+
+    /// Checks if the provided `id` is an existent location in self.locations
+    pub fn check_location_exists(&self, id: &Uuid) -> bool {
+        self.locations.contains_key(&id)
+    }
+
     /// Returns a reference to the current location
     pub fn get_current_location(&self) -> Result<&Location, ProjectError> {
         self.locations
             .get(&self.id_current_location)
+            .ok_or_else(|| HashMapGetError(self.id_current_location.to_string()))
+    }
+
+    /// Returns a reference to the current location
+    pub fn get_location(&self, id: &Uuid) -> Result<&Location, ProjectError> {
+        self.locations
+            .get(id)
             .ok_or_else(|| HashMapGetError(self.id_current_location.to_string()))
     }
 }

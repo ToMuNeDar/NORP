@@ -5,6 +5,10 @@ use thiserror::Error;
 pub enum ProjectError {
     #[error("Standard Error encountered.")]
     StandardError,
+    #[error("Invalid id for location given.")]
+    LocationInvalidIdError,
+    #[error("Provided id does not correspond to a location.")]
+    LocationNotFoundError,
     #[error("Failed to read locations file.")]
     LocationsFileReadError,
     #[error("Failed to write locations file.")]
@@ -21,4 +25,6 @@ pub enum ProjectError {
     CommandNotGivenError,
     #[error("Unrecognized command: \"{0}\".")]
     CommandUnrecognizedError(String),
+    #[error("No location provided for move.")]
+    MoveNoLocationError,
 }

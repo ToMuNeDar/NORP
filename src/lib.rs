@@ -37,7 +37,7 @@ pub fn run() -> Result<(), ProjectError> {
         state.get_current_location()?.print();
         // Read inputs or skip loop if none valid
         let input: String = read!("{}\n");
-        let command = match Command::new(input.as_str()) {
+        let command = match Command::new(&input) {
             Err(project_error) => match project_error {
                 CommandUnrecognizedError(_) => {
                     println!("{}", project_error);
@@ -87,7 +87,12 @@ impl Command {
                         .map_err(|_| LocationInvalidIdError)?;
                 state.set_current_location(&mut id)
             }
-            Command::AddLocation(args) => Err(StandardError),
+            Command::AddLocation(args) => {
+                let name: String = String::from(&args[1]);
+                let description: String = String::from(&args[2]);
+                let location = Location::new(&name, Some(&description))?;
+                state.add_location(location)
+            }
         }
     }
 }
